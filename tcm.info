@@ -1,0 +1,6 @@
+name = Theme Component Manager
+description = add component-based theming.
+core = 7.x
+package = Administration
+
+
