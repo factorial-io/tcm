@@ -1,0 +1,13 @@
+{
+  "name": "slideshow",
+  "backend": {
+    "template": "slideshow.tpl.haml",
+    "arguments": {
+      "items": [
+        { "image": { "src": "http://fillmurray.com/200/300"}},
+        { "image": { "src": "http://fillmurray.com/200/300"}},
+        { "image": { "src": "http://fillmurray.com/200/300"}}
+      ]
+    }
+  }
+}

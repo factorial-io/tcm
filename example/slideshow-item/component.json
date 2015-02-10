@@ -1,0 +1,11 @@
+{
+  "name": "slideshow item",
+  "backend": {
+    "template": "slideshow-item.tpl.haml",
+    "arguments": {
+      "image": {
+        "src": "http://fillmurray.com/200/300"
+      }
+    }
+  }
+}
