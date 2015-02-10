@@ -10,10 +10,11 @@
  */
 class ComponentBase extends StdClass {
   protected $name;
+  protected $machineName;
   protected $folder;
   protected $scripts = array();
   protected $styles = array();
-  protected $template = NULL;
+  protected $template = FALSE;
   protected $arguments = array();
 
   /**
@@ -21,16 +22,21 @@ class ComponentBase extends StdClass {
    */
   public function __construct($folder, $data) {
     $this->name = $data->name;
+    $this->machineName = drupal_html_class($this->name);
     $this->folder = $folder;
+
     $this->scripts = isset($data->scripts) ? $data->scripts : array();
     $this->styles = isset($data->styles) ? $data->styles : array();
-    $this->template = $data->backend->template;
-    foreach ($data->backend->arguments as $key => $value) {
-      if (is_object($value)) {
-        $this->arguments[$key] = (array) $value;
-      }
-      else {
-        $this->arguments[$key] = $value;
+
+    if (!empty($data->backend)) {
+      $this->template = $data->backend->template;
+      foreach ($data->backend->arguments as $key => $value) {
+        if (is_object($value)) {
+          $this->arguments[$key] = (array) $value;
+        }
+        else {
+          $this->arguments[$key] = $value;
+        }
       }
     }
   }
@@ -40,6 +46,13 @@ class ComponentBase extends StdClass {
    */
   public function getName() {
     return $this->name;
+  }
+
+  /**
+   * Get the machine-name of the component.
+   */
+  public function getMachineName($with_underscores = FALSE) {
+    return $with_underscores ? str_replace('-', '_', $this->machineName) : $this->machineName;
   }
 
   /**
@@ -73,9 +86,6 @@ class ComponentBase extends StdClass {
   public function getFolder() {
     return $this->folder;
   }
-
-
-
 }
 
 
@@ -91,14 +101,16 @@ function tcm_register_theme_functions($existing, $type, $theme, $path) {
   }
 
   foreach ($components as $component) {
-    $result['component_' . $component->getName()] = array(
-      'variables' => array('component' => NULL, 'arguments' => $component->getDefaultArguments()),
-      'path' => $component->getFolder(),
-      'template' => $component->getTemplate(),
-      'preprocess functions' => array('tcm_preprocess_component')
-    );
+    if ($component->getTemplate()) {
+      $result['component_' . $component->getMachineName(TRUE)] = array(
+        'variables' => array('component' => NULL, 'arguments' => $component->getDefaultArguments()),
+        'path' => $component->getFolder(),
+        'template' => $component->getTemplate(),
+        'preprocess functions' => array('tcm_preprocess_component')
+      );
+    }
   }
-  dsm($result);
+
   return $result;
 }
 
@@ -106,10 +118,8 @@ function tcm_register_theme_functions($existing, $type, $theme, $path) {
 /**
  * Find all components and register them.
  */
-function _tcm_register_components($path_to_theme) {
+function _tcm_register_components($dir) {
   $components = array();
-
-  $dir = $path_to_theme . '/components';
 
   if (!is_dir($dir)) {
     return FALSE;
@@ -121,12 +131,13 @@ function _tcm_register_components($path_to_theme) {
         continue;
       }
       $file = $dir . DIRECTORY_SEPARATOR . $file;
+
       if (is_dir($file)) {
         if ($component = tcm_read_component($file)) {
-          $components[$component->getName()] = $component;
+          $components[$component->getMachineName()] = $component;
         }
         else {
-          dsm("Could not read component from " . $file);
+          // dsm("Could not read component from " . $file);
         }
       }
     }
@@ -150,9 +161,10 @@ function tcm_register_components($path_to_theme) {
     dsm("get from cache");
   }
   else {
-    $components = _tcm_register_components($path_to_theme);
+    $components = _tcm_register_components($path_to_theme . '/components');
+    $components += _tcm_register_components($path_to_theme . '/components_local');
     cache_set($cache_id, $components);
-    dsm("get from file-system");
+    // dsm("get from file-system");
   }
 
   return $components;
@@ -192,13 +204,18 @@ function component($component_name, $arguments = array()) {
   $components = tcm_get_components();
   if (!isset($components[$component_name])) {
     drupal_set_message(t('Component not found %c', array('%c' => $component_name)));
-    return FALSE;
+    $msg = t('missing component %component', array(
+      '%component' => $component_name)
+    );
+    return '<div class="missingComponent">' . $msg . '</div>';
   }
 
   $component = $components[$component_name];
-  $component->attachAssets();
+  if (variable_get('tcm_attach_assets', FALSE)) {
+    $component->attachAssets();
+  }
 
-  return theme('component_' . $component_name, array('component' => $component, 'arguments' => $arguments));
+  return theme('component_' . str_replace('-', '_', $component_name), array('component' => $component, 'arguments' => $arguments));
 }
 
 /**
@@ -207,7 +224,6 @@ function component($component_name, $arguments = array()) {
 function tcm_preprocess_component(&$variables) {
   $component = $variables['component'];
   $arguments = $component->getArguments($variables['arguments']);
-  dsm($arguments);
-  $variables = drupal_array_merge_deep($variables, $arguments);
 
+  $variables = drupal_array_merge_deep($arguments, $variables);
 }
