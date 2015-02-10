@@ -158,7 +158,7 @@ function tcm_register_components($path_to_theme) {
   $cache_id = 'tcm:components:' . $path_to_theme;
   if (!variable_get('devel_rebuild_theme_registry', FALSE) && $data = cache_get($cache_id)) {
     $components = $data->data;
-    dsm("get from cache");
+    // dsm("get from cache");
   }
   else {
     $components = _tcm_register_components($path_to_theme . '/components');
