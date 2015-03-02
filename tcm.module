@@ -6,6 +6,26 @@
 
 
 /**
+ * Helper method to convert an object to an array
+ */
+function _object_to_array($obj) {
+  if (is_object($obj)) {
+    $obj = (array) $obj;
+  }
+  if (is_array($obj)) {
+    $new = array();
+    foreach ($obj as $key => $val) {
+      $new[$key] = _object_to_array($val);
+    }
+  }
+  else {
+    $new = $obj;
+  }
+
+  return $new;
+}
+
+/**
  * Base class for a component.
  */
 class ComponentBase extends StdClass {
@@ -30,15 +50,9 @@ class ComponentBase extends StdClass {
 
     if (!empty($data->backend)) {
       $this->template = $data->backend->template;
-      foreach ($data->backend->arguments as $key => $value) {
-        if (is_object($value)) {
-          $this->arguments[$key] = (array) $value;
-        }
-        else {
-          $this->arguments[$key] = $value;
-        }
-      }
+      $this->arguments = _object_to_array($data->backend->arguments);
     }
+    echo '<pre>';print_r($this->arguments); echo '</pre>';
   }
 
   /**
@@ -156,7 +170,7 @@ function tcm_register_components($path_to_theme) {
   }
 
   $cache_id = 'tcm:components:' . $path_to_theme;
-  if (!variable_get('devel_rebuild_theme_registry', FALSE) && $data = cache_get($cache_id)) {
+  if (0 && !variable_get('devel_rebuild_theme_registry', FALSE) && $data = cache_get($cache_id)) {
     $components = $data->data;
     // dsm("get from cache");
   }
