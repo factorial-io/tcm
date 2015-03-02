@@ -52,7 +52,6 @@ class ComponentBase extends StdClass {
       $this->template = $data->backend->template;
       $this->arguments = _object_to_array($data->backend->arguments);
     }
-    echo '<pre>';print_r($this->arguments); echo '</pre>';
   }
 
   /**
@@ -170,7 +169,7 @@ function tcm_register_components($path_to_theme) {
   }
 
   $cache_id = 'tcm:components:' . $path_to_theme;
-  if (0 && !variable_get('devel_rebuild_theme_registry', FALSE) && $data = cache_get($cache_id)) {
+  if (!variable_get('devel_rebuild_theme_registry', FALSE) && $data = cache_get($cache_id)) {
     $components = $data->data;
     // dsm("get from cache");
   }
