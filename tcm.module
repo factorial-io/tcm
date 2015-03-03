@@ -116,7 +116,11 @@ function tcm_register_theme_functions($existing, $type, $theme, $path) {
   foreach ($components as $component) {
     if ($component->getTemplate()) {
       $result['component_' . $component->getMachineName(TRUE)] = array(
-        'variables' => array('component' => NULL, 'arguments' => $component->getDefaultArguments()),
+        'variables' => array(
+          'component' => NULL,
+          'arguments' => $component->getDefaultArguments(),
+          'defaults' => array()
+        ),
         'path' => $component->getFolder(),
         'template' => $component->getTemplate(),
         'preprocess functions' => array('tcm_preprocess_component')
@@ -212,7 +216,19 @@ function tcm_read_component($directory_path) {
 /**
  * Return a themed component.
  */
-function component($component_name, $arguments = array()) {
+function component() {
+  $args = func_get_args();
+
+  $component_name = array_shift($args);
+  $defaults = array();
+  $arguments = array();
+
+  if (count($args) > 1) {
+    $defaults = array_shift($args);
+  }
+  if (count($args) > 0) {
+    $arguments = array_shift($args);
+  }
 
   $components = tcm_get_components();
   if (!isset($components[$component_name])) {
@@ -228,7 +244,11 @@ function component($component_name, $arguments = array()) {
     $component->attachAssets();
   }
 
-  return theme('component_' . str_replace('-', '_', $component_name), array('component' => $component, 'arguments' => $arguments));
+  return theme('component_' . str_replace('-', '_', $component_name), array(
+    'component' => $component,
+    'defaults' => $defaults,
+    'arguments' => $arguments
+  ));
 }
 
 /**
@@ -236,7 +256,54 @@ function component($component_name, $arguments = array()) {
  */
 function tcm_preprocess_component(&$variables) {
   $component = $variables['component'];
-  $arguments = $component->getArguments($variables['arguments']);
+  $defaults = $component->getArguments($variables['defaults']);
+  $arguments = drupal_array_merge_deep($defaults, $variables['arguments']);
 
   $variables = drupal_array_merge_deep($arguments, $variables);
+}
+
+/**
+ * Get lorem ipsum text as HTML.
+ *
+ * @param int $num_paragraphs
+ *   num paragraphs to create
+ * @param string $textLength
+ *   length of the text (short|medium|long)
+ * @param bool $decorate
+ *   TRUE, if you want bold and italic text
+ * @param bool $links
+ *   TRUE, if you want to get links
+ *
+ * @return string
+ *   created text
+ */
+function tcm_lorem_ipsum_html($num_paragraphs = 10, $text_length = 'medium', $decorate = FALSE, $links = FALSE) {
+
+  $url = array('http://loripsum.net/api', $num_paragraphs, $text_length);
+  if ($decorate) {
+    $url[] = 'decorate';
+  }
+  if ($links) {
+    $url[] = 'link';
+  }
+
+  $url = implode('/', $url);
+  $cache_id = 'tcm_lorem_impsum:' . $url;
+  if ($data = cache_get($cache_id)) {
+    return $data->data;
+  }
+
+  $data = file_get_contents($url);
+
+  cache_set($cache_id, $data);
+
+  return $data;
+}
+
+/**
+ * Create lorem ipsum text without any markup
+ */
+function tcm_lorem_ipsum($num_paragraphs = 10, $text_length = 'medium') {
+  $html = tcm_lorem_ipsum_html($num_paragraphs, $text_length);
+  return strip_tags($html);
 }
