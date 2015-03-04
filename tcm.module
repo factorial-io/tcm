@@ -260,6 +260,25 @@ function tcm_preprocess_component(&$variables) {
   $arguments = drupal_array_merge_deep($defaults, $variables['arguments']);
 
   $variables = drupal_array_merge_deep($arguments, $variables);
+  array_walk_recursive($variables,
+    function(&$elem) {
+      if (is_string($elem) && ($elem[0] == '#')) {
+        $pos_1 = strpos($elem, '(');
+        $pos_2 = strpos($elem, ')');
+        if (($pos_1 !== FALSE) && ($pos_2 !== FALSE)) {
+          $func_name = 'tcm_' . substr($elem, 1, $pos_1 - 1);
+          $params = substr($elem, $pos_1 + 1, $pos_2 - $pos_1 - 1);
+          $func_args = array();
+          if (!empty($params)) {
+            $func_args = array_map('trim', explode(',', $params));
+          }
+          if (function_exists($func_name)) {
+            $elem = call_user_func_array($func_name, $func_args);
+          }
+        }
+      }
+    }
+  );
 }
 
 /**
