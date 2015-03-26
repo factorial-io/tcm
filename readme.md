@@ -14,7 +14,7 @@ function mytheme_theme($existing, $type, $theme, $path) {
   $theme_declaration = tcm_register_theme_functions($existing, $type, $theme, $path);
 
   // Your existing theme-declarations:
-  $theme_declaration['mytheme'] = array()
+  $theme_declaration['mytheme'] = array();
 
   return $theme_declaration;
 }
@@ -35,7 +35,7 @@ Your component-folder should at least contain two files:
 
 ## The component.json-file
 
-The component.json-file should include at least a name-property, and if you want to use it from the backend-site, a backend-property:
+The component.json-file should include at least a name-property, and if you want to use it from the backend-side, a backend-property:
 
 ```
 {
