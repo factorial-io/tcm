@@ -146,11 +146,10 @@ function tcm_theme_registry_alter(&$theme_registry) {
 /**
  * Find all components and register them.
  */
-function _tcm_register_components($dir) {
-  $components = array();
+function _tcm_register_components(&$components, $dir, $recursive) {
 
   if (!is_dir($dir)) {
-    return array();;
+    return array();
   }
 
   if ($handle = opendir($dir)) {
@@ -162,17 +161,21 @@ function _tcm_register_components($dir) {
 
       if (is_dir($file)) {
         if ($component = tcm_read_component($file)) {
+          // dsm($file, 'found');
           $components[$component->getMachineName()] = $component;
         }
         else {
-          // dsm("Could not read component from " . $file);
+          if ($recursive) {
+            _tcm_register_components($components, $file, $recursive);
+          }
+          else {
+            // dsm("Could not read component from " . $file);
+          }
         }
       }
     }
     closedir($handle);
   }
-
-  return $components;
 }
 
 
@@ -182,15 +185,15 @@ function tcm_register_components($path_to_theme) {
   if (!is_null($components)) {
     return $components;
   }
-
   $cache_id = 'tcm:components:' . $path_to_theme;
   if (!variable_get('devel_rebuild_theme_registry', FALSE) && $data = cache_get($cache_id)) {
     $components = $data->data;
     // dsm("get from cache");
   }
   else {
-    $components = _tcm_register_components($path_to_theme . '/components');
-    $components += _tcm_register_components($path_to_theme . '/components_local');
+    $components = array();
+    _tcm_register_components($components, $path_to_theme . '/components', TRUE);
+    _tcm_register_components($components, $path_to_theme . '/components_local', FALSE);
     cache_set($cache_id, $components);
     // dsm("get from file-system");
   }
@@ -218,7 +221,8 @@ function tcm_read_component($directory_path) {
   $content = file_get_contents($filename);
   $data = json_decode($content);
   if (!empty($data) && is_object($data)) {
-    return new ComponentBase($directory_path, $data);
+    $component = new ComponentBase($directory_path, $data);
+    return $component;
   }
   return FALSE;
 }

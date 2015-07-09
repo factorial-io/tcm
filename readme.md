@@ -1,8 +1,8 @@
 # Readme
 
-tcm is a small helper oduel to get a component-based workflow also in your theme-layer.
+tcm is a small helper module to get a component-based workflow also in your theme-layer.
 
-It scans two folders of your them and register every found component as a theming function in your theme.
+It scans two folders of your theme and registers every found component as a theming function in your theme.
 
 ## Installation
 
@@ -14,7 +14,7 @@ function mytheme_theme($existing, $type, $theme, $path) {
   $theme_declaration = tcm_register_theme_functions($existing, $type, $theme, $path);
 
   // Your existing theme-declarations:
-  $theme_declaration['mytheme'] = array()
+  $theme_declaration['mytheme'] = array();
 
   return $theme_declaration;
 }
@@ -35,7 +35,7 @@ Your component-folder should at least contain two files:
 
 ## The component.json-file
 
-The component.json-file should include at least a name-property, and if you want to use it from the backend-site, a backend-property:
+The component.json-file should include at least a name-property, and if you want to use it from the backend-side, a backend-property:
 
 ```
 {
@@ -58,7 +58,7 @@ The component.json-file should include at least a name-property, and if you want
     * ``arguments`` is a json-object describing the default arguments for this component
   * ``styles`` / ``scripts``: the module has preliminary support for embedding styles + JS defined in a component
     It's usually better to use duo.js/ grunt to package your frontend-files together.
-    If you want, that drupal adds styles and or scripts when using a component, then set the variable ``tcm_attach_assets`` to TRUE.
+    If you want Drupal to be able to add styles and or scripts when using a component, then set the variable ``tcm_attach_assets`` to TRUE.
 
 
 ## Usage
