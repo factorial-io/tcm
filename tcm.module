@@ -251,20 +251,7 @@ function tcm_read_component($directory_path) {
 /**
  * Return a themed component.
  */
-function component() {
-  $args = func_get_args();
-
-  $component_name = array_shift($args);
-  $options = array();
-  $data = NULL;
-
-  if (count($args) > 1) {
-    $options = array_shift($args);
-  }
-  if (count($args) > 0) {
-    $data = array_shift($args);
-  }
-
+function component($component_name, $data = NULL, $options = array()) {
   $components = tcm_get_components();
   if (!isset($components[$component_name])) {
     drupal_set_message(t('Component not found %c', array('%c' => $component_name)));
