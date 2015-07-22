@@ -50,7 +50,7 @@ class ComponentBase extends StdClass {
     $this->styles = isset($data->styles) ? $data->styles : array();
 
     if (!empty($data->backend)) {
-      $this->template = $data->backend->template;
+      $this->template = !empty($data->backend->template) ? $data->backend->template : FALSE;
       if (!empty($data->backend->arguments)) {
         drupal_set_message(t('Component %component uses old format, split arguments into fixture and options!', array(
           '%component' => $this->name)), 'error');
@@ -109,6 +109,10 @@ class ComponentBase extends StdClass {
     return substr($this->template, 0, $pos);
   }
 
+  public function hasTemplate() {
+    return !empty($this->template);
+  }
+
   public function getFolder() {
     return $this->folder;
   }
@@ -127,7 +131,7 @@ function tcm_register_theme_functions($existing, $type, $theme, $path) {
   }
 
   foreach ($components as $component) {
-    if ($component->getTemplate()) {
+    if ($component->hasTemplate()) {
       $result['component_' . $component->getMachineName(TRUE)] = array(
         'variables' => array(
           'component' => NULL,
@@ -236,6 +240,9 @@ function tcm_read_component($directory_path) {
   if (!empty($data) && is_object($data)) {
     $component = new ComponentBase($directory_path, $data);
     return $component;
+  }
+  else {
+    drupal_set_message(t('Can\t decode component.json at %path', array('%path' => $directory_path)), 'error');
   }
   return FALSE;
 }
@@ -366,7 +373,7 @@ function tcm_menu() {
     'admin/components' => array(
       'title' => 'Components',
       'page callback' => 'tcm_page',
-      'access arguments' => 'show tcm components',
+      'access arguments' => array('show tcm components'),
       'type' => MENU_NORMAL_ITEM,
     ),
   );
@@ -404,6 +411,9 @@ function tcm_page($component_name = FALSE) {
   dsm($components);
   $page = array();
   foreach ($components as $component) {
+    if (!$component->hasTemplate()) {
+      continue;
+    }
     $page[] = array(
       array(
         '#prefix' => '<h2>',
