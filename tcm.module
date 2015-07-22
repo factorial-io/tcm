@@ -35,7 +35,8 @@ class ComponentBase extends StdClass {
   protected $scripts = array();
   protected $styles = array();
   protected $template = FALSE;
-  protected $arguments = array();
+  protected $fixture = array();
+  protected $options = array();
 
   /**
    * Constructor.
@@ -50,7 +51,15 @@ class ComponentBase extends StdClass {
 
     if (!empty($data->backend)) {
       $this->template = $data->backend->template;
-      $this->arguments = _object_to_array($data->backend->arguments);
+      if (!empty($data->backend->arguments)) {
+        drupal_set_message(t('Component %component uses old format, split arguments into fixture and options!', array(
+          '%component' => $this->name)), 'error');
+      }
+      foreach (array('fixture', 'options') as $key) {
+        if (!empty($data->backend->{$key})) {
+          $this->{$key} = _object_to_array($data->backend->{$key});
+        }
+      }
     }
   }
 
@@ -83,13 +92,17 @@ class ComponentBase extends StdClass {
   /**
    * Get arguments for this component.
    */
-  public function getArguments($arguments) {
-    return drupal_array_merge_deep($this->arguments, $arguments);
+  public function getOptions($options = array()) {
+    return drupal_array_merge_deep($this->options, $options);
   }
 
-  public function getDefaultArguments() {
-    return $this->arguments;
+  /**
+   * Get the fixture-data.
+   */
+  public function getData($data = NULL) {
+    return is_null($data) ? $this->fixture : $data;
   }
+
 
   public function getTemplate() {
     $pos = strpos($this->template, '.');
@@ -118,8 +131,8 @@ function tcm_register_theme_functions($existing, $type, $theme, $path) {
       $result['component_' . $component->getMachineName(TRUE)] = array(
         'variables' => array(
           'component' => NULL,
-          'arguments' => $component->getDefaultArguments(),
-          'defaults' => array(),
+          'data' => NULL,
+          'options' => array(),
         ),
         'path' => $component->getFolder(),
         'template' => $component->getTemplate(),
@@ -235,14 +248,14 @@ function component() {
   $args = func_get_args();
 
   $component_name = array_shift($args);
-  $defaults = array();
-  $arguments = array();
+  $options = array();
+  $data = NULL;
 
   if (count($args) > 1) {
-    $defaults = array_shift($args);
+    $options = array_shift($args);
   }
   if (count($args) > 0) {
-    $arguments = array_shift($args);
+    $data = array_shift($args);
   }
 
   $components = tcm_get_components();
@@ -262,8 +275,8 @@ function component() {
   $theme_func = 'component_' . str_replace('-', '_', $component_name);
   return theme($theme_func, array(
     'component' => $component,
-    'defaults' => $defaults,
-    'arguments' => $arguments
+    'options' => $options,
+    'data' => $data
   ));
 }
 
@@ -272,10 +285,12 @@ function component() {
  */
 function tcm_preprocess_component(&$variables) {
   $component = $variables['component'];
-  $defaults = $component->getArguments($variables['defaults']);
-  $arguments = drupal_array_merge_deep($defaults, $variables['arguments']);
+  $options = $component->getOptions($variables['options']);
+  $data = $component->getData($variables['data']);
 
-  $variables = drupal_array_merge_deep($arguments, $variables);
+  $variables = drupal_array_merge_deep($variables, $options);
+  $variables = drupal_array_merge_deep($variables, $data);
+
   array_walk_recursive($variables,
     function(&$elem) {
       if (is_string($elem) && (strlen($elem) > 0) && ($elem[0] == '#')) {
@@ -341,4 +356,64 @@ function tcm_lorem_ipsum_html($num_paragraphs = 10, $text_length = 'medium', $de
 function tcm_lorem_ipsum($num_paragraphs = 10, $text_length = 'medium') {
   $html = tcm_lorem_ipsum_html($num_paragraphs, $text_length);
   return strip_tags($html);
+}
+
+/**
+ * Implements hook_menu().
+ */
+function tcm_menu() {
+  return array(
+    'admin/components' => array(
+      'title' => 'Components',
+      'page callback' => 'tcm_page',
+      'access arguments' => 'show tcm components',
+      'type' => MENU_NORMAL_ITEM,
+    ),
+  );
+}
+
+
+/**
+ * Implements hook_permission().
+ */
+function tcm_permission() {
+ return array(
+    'show tcm components' => array(
+      'title' => t('ow TCM components'),
+      'description' => t('Show all TCM components.'),
+    ),
+  );
+}
+
+/**
+ * Implements hook_admin_paths().
+ */
+function tcm_admin_paths() {
+  $paths = array(
+    'admin/components' => FALSE,
+    'admin/components/*' => FALSE,
+  );
+  return $paths;
+}
+
+function tcm_page($component_name = FALSE) {
+  if ($component_name) {
+    return component($component_name);
+  }
+  $components = tcm_get_components();
+  dsm($components);
+  $page = array();
+  foreach ($components as $component) {
+    $page[] = array(
+      array(
+        '#prefix' => '<h2>',
+        '#suffix' => '</h2>',
+        '#markup' => l($component->getName(), 'admin/components/' . $component->getMachineName()),
+      ),
+      array(
+        '#markup' => component($component->getMachineName()),
+      )
+    );
+  };
+  return $page;
 }
