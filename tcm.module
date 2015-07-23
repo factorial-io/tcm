@@ -35,7 +35,8 @@ class ComponentBase extends StdClass {
   protected $scripts = array();
   protected $styles = array();
   protected $template = FALSE;
-  protected $arguments = array();
+  protected $fixture = array();
+  protected $options = array();
 
   /**
    * Constructor.
@@ -49,8 +50,16 @@ class ComponentBase extends StdClass {
     $this->styles = isset($data->styles) ? $data->styles : array();
 
     if (!empty($data->backend)) {
-      $this->template = $data->backend->template;
-      $this->arguments = _object_to_array($data->backend->arguments);
+      $this->template = !empty($data->backend->template) ? $data->backend->template : FALSE;
+      if (!empty($data->backend->arguments)) {
+        drupal_set_message(t('Component %component uses old format, split arguments into fixture and options!', array(
+          '%component' => $this->name)), 'error');
+      }
+      foreach (array('fixture', 'options') as $key) {
+        if (!empty($data->backend->{$key})) {
+          $this->{$key} = _object_to_array($data->backend->{$key});
+        }
+      }
     }
   }
 
@@ -83,17 +92,25 @@ class ComponentBase extends StdClass {
   /**
    * Get arguments for this component.
    */
-  public function getArguments($arguments) {
-    return drupal_array_merge_deep($this->arguments, $arguments);
+  public function getOptions($options = array()) {
+    return drupal_array_merge_deep($this->options, $options);
   }
 
-  public function getDefaultArguments() {
-    return $this->arguments;
+  /**
+   * Get the fixture-data.
+   */
+  public function getData($data = NULL) {
+    return is_null($data) ? $this->fixture : $data;
   }
+
 
   public function getTemplate() {
     $pos = strpos($this->template, '.');
     return substr($this->template, 0, $pos);
+  }
+
+  public function hasTemplate() {
+    return !empty($this->template);
   }
 
   public function getFolder() {
@@ -114,12 +131,12 @@ function tcm_register_theme_functions($existing, $type, $theme, $path) {
   }
 
   foreach ($components as $component) {
-    if ($component->getTemplate()) {
+    if ($component->hasTemplate()) {
       $result['component_' . $component->getMachineName(TRUE)] = array(
         'variables' => array(
           'component' => NULL,
-          'arguments' => $component->getDefaultArguments(),
-          'defaults' => array(),
+          'data' => NULL,
+          'options' => array(),
         ),
         'path' => $component->getFolder(),
         'template' => $component->getTemplate(),
@@ -224,6 +241,9 @@ function tcm_read_component($directory_path) {
     $component = new ComponentBase($directory_path, $data);
     return $component;
   }
+  else {
+    drupal_set_message(t('Can\t decode component.json at %path', array('%path' => $directory_path)), 'error');
+  }
   return FALSE;
 }
 
@@ -231,20 +251,7 @@ function tcm_read_component($directory_path) {
 /**
  * Return a themed component.
  */
-function component() {
-  $args = func_get_args();
-
-  $component_name = array_shift($args);
-  $defaults = array();
-  $arguments = array();
-
-  if (count($args) > 1) {
-    $defaults = array_shift($args);
-  }
-  if (count($args) > 0) {
-    $arguments = array_shift($args);
-  }
-
+function component($component_name, $data = NULL, $options = array()) {
   $components = tcm_get_components();
   if (!isset($components[$component_name])) {
     drupal_set_message(t('Component not found %c', array('%c' => $component_name)));
@@ -262,8 +269,8 @@ function component() {
   $theme_func = 'component_' . str_replace('-', '_', $component_name);
   return theme($theme_func, array(
     'component' => $component,
-    'defaults' => $defaults,
-    'arguments' => $arguments
+    'options' => $options,
+    'data' => $data
   ));
 }
 
@@ -272,24 +279,32 @@ function component() {
  */
 function tcm_preprocess_component(&$variables) {
   $component = $variables['component'];
-  $defaults = $component->getArguments($variables['defaults']);
-  $arguments = drupal_array_merge_deep($defaults, $variables['arguments']);
+  $options = $component->getOptions($variables['options']);
+  $data = $component->getData($variables['data']);
 
-  $variables = drupal_array_merge_deep($arguments, $variables);
+  $variables = drupal_array_merge_deep($variables, $options);
+  $variables = drupal_array_merge_deep($variables, $data);
+
   array_walk_recursive($variables,
     function(&$elem) {
       if (is_string($elem) && (strlen($elem) > 0) && ($elem[0] == '#')) {
         $pos_1 = strpos($elem, '(');
         $pos_2 = strpos($elem, ')');
         if (($pos_1 !== FALSE) && ($pos_2 !== FALSE)) {
-          $func_name = 'tcm_' . substr($elem, 1, $pos_1 - 1);
+          $func_name = 'tcm_fixture_' . substr($elem, 1, $pos_1 - 1);
           $params = substr($elem, $pos_1 + 1, $pos_2 - $pos_1 - 1);
+          module_load_include('fixturefunctions.inc', 'tcm');
           $func_args = array();
           if (!empty($params)) {
             $func_args = array_map('trim', explode(',', $params));
           }
           if (function_exists($func_name)) {
             $elem = call_user_func_array($func_name, $func_args);
+          }
+          else {
+            drupal_set_message(t('Could not find fixture-function %function!', array(
+              '%function' => $func_name
+            )), 'error');
           }
         }
       }
@@ -298,47 +313,64 @@ function tcm_preprocess_component(&$variables) {
 }
 
 /**
- * Get lorem ipsum text as HTML.
- *
- * @param int $num_paragraphs
- *   num paragraphs to create
- * @param string $textLength
- *   length of the text (short|medium|long)
- * @param bool $decorate
- *   TRUE, if you want bold and italic text
- * @param bool $links
- *   TRUE, if you want to get links
- *
- * @return string
- *   created text
+ * Implements hook_menu().
  */
-function tcm_lorem_ipsum_html($num_paragraphs = 10, $text_length = 'medium', $decorate = FALSE, $links = FALSE) {
+function tcm_menu() {
+  return array(
+    'admin/components' => array(
+      'title' => 'Components',
+      'page callback' => 'tcm_page',
+      'access arguments' => array('show tcm components'),
+      'type' => MENU_NORMAL_ITEM,
+    ),
+  );
+}
 
-  $url = array('http://loripsum.net/api', $num_paragraphs, $text_length);
-  if ($decorate) {
-    $url[] = 'decorate';
-  }
-  if ($links) {
-    $url[] = 'link';
-  }
 
-  $url = implode('/', $url);
-  $cache_id = 'tcm_lorem_impsum:' . $url;
-  if ($data = cache_get($cache_id)) {
-    return $data->data;
-  }
-
-  $data = file_get_contents($url);
-
-  cache_set($cache_id, $data);
-
-  return $data;
+/**
+ * Implements hook_permission().
+ */
+function tcm_permission() {
+ return array(
+    'show tcm components' => array(
+      'title' => t('ow TCM components'),
+      'description' => t('Show all TCM components.'),
+    ),
+  );
 }
 
 /**
- * Create lorem ipsum text without any markup
+ * Implements hook_admin_paths().
  */
-function tcm_lorem_ipsum($num_paragraphs = 10, $text_length = 'medium') {
-  $html = tcm_lorem_ipsum_html($num_paragraphs, $text_length);
-  return strip_tags($html);
+function tcm_admin_paths() {
+  $paths = array(
+    'admin/components' => FALSE,
+    'admin/components/*' => FALSE,
+  );
+  return $paths;
+}
+
+function tcm_page($component_name = FALSE) {
+  if ($component_name) {
+    return component($component_name);
+  }
+  $components = tcm_get_components();
+  dsm($components);
+  $page = array();
+  foreach ($components as $component) {
+    if (!$component->hasTemplate()) {
+      continue;
+    }
+    $page[] = array(
+      array(
+        '#prefix' => '<h2>',
+        '#suffix' => '</h2>',
+        '#markup' => l($component->getName(), 'admin/components/' . $component->getMachineName()),
+      ),
+      array(
+        '#markup' => component($component->getMachineName()),
+      )
+    );
+  };
+  return $page;
 }
