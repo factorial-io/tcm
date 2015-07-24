@@ -43,7 +43,7 @@ function tcm_fixture_lorem_ipsum_html($num_paragraphs = 10, $text_length = 'medi
  * Create lorem ipsum text without any markup
  */
 function tcm_fixture_lorem_ipsum($num_paragraphs = 10, $text_length = 'medium') {
-  $html = tcm_lorem_ipsum_html($num_paragraphs, $text_length);
+  $html = tcm_fixture_lorem_ipsum_html($num_paragraphs, $text_length);
   return strip_tags($html);
 }
 
