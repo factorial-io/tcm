@@ -275,9 +275,28 @@ function component($component_name, $data = NULL, $options = array()) {
 }
 
 /**
+ * Get all external fixtures.
+ */
+function _tcm_get_external_fixture_functions() {
+  static $cache = NULL;
+  if (is_null($cache)) {
+    $cache = array(
+      'lorem_ipsum' => 'tcm_fixture_lorem_ipsum',
+      'lorem_ipsum_html' => 'tcm_fixture_lorem_ipsum_html',
+      'image' => 'tcm_fixture_image',
+    );
+    drupal_alter('tcm_fixture_functions', $cache);
+  }
+
+  return $cache;
+}
+
+
+/**
  * Implementation of hook_preprocess_tcm().
  */
 function tcm_preprocess_component(&$variables) {
+  $fixture_functions = _tcm_get_external_fixture_functions();
   $component = $variables['component'];
   $options = $component->getOptions($variables['options']);
   $data = $component->getData($variables['data']);
@@ -286,17 +305,20 @@ function tcm_preprocess_component(&$variables) {
   $variables = drupal_array_merge_deep($variables, $data);
 
   array_walk_recursive($variables,
-    function(&$elem) {
+    function(&$elem) use($fixture_functions) {
       if (is_string($elem) && (strlen($elem) > 0) && ($elem[0] == '#')) {
         $pos_1 = strpos($elem, '(');
         $pos_2 = strpos($elem, ')');
         if (($pos_1 !== FALSE) && ($pos_2 !== FALSE)) {
-          $func_name = 'tcm_fixture_' . substr($elem, 1, $pos_1 - 1);
+          $func_name = substr($elem, 1, $pos_1 - 1);
           $params = substr($elem, $pos_1 + 1, $pos_2 - $pos_1 - 1);
           module_load_include('fixturefunctions.inc', 'tcm');
           $func_args = array();
           if (!empty($params)) {
             $func_args = array_map('trim', explode(',', $params));
+          }
+          if (isset($fixture_functions[$func_name])) {
+            $func_name = $fixture_functions[$func_name];
           }
           if (function_exists($func_name)) {
             $elem = call_user_func_array($func_name, $func_args);
