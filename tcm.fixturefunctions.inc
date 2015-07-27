@@ -53,3 +53,7 @@ function tcm_fixture_lorem_ipsum($num_paragraphs = 10, $text_length = 'medium') 
 function tcm_fixture_image($width = 400, $height = 300) {
   return "http://fillmurray.com/$width/$height";
 }
+
+function tcm_fixture_component($component_name, $data = NULL, $options= array()) {
+  return component($component_name, $data, $options);
+}
