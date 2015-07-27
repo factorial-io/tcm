@@ -306,7 +306,7 @@ function tcm_preprocess_component(&$variables) {
 
   array_walk_recursive($variables,
     function(&$elem) use($fixture_functions) {
-      if (is_string($elem) && (strlen($elem) > 0) && ($elem[0] == '#')) {
+      if (is_string($elem) && (strlen($elem) > 0) && ($elem[0] == '@')) {
         $pos_1 = strpos($elem, '(');
         $pos_2 = strpos($elem, ')');
         if (($pos_1 !== FALSE) && ($pos_2 !== FALSE)) {
