@@ -372,7 +372,11 @@ function tcm_admin_paths() {
   return $paths;
 }
 
+/**
+ * Page callback for components-overview and -detail.
+ */
 function tcm_page($component_name = FALSE) {
+  tcm_cache_clear();
   if ($component_name) {
     return component($component_name);
   }
@@ -395,4 +399,11 @@ function tcm_page($component_name = FALSE) {
     );
   };
   return $page;
+}
+
+/**
+ * Clear the tcm cache.
+ */
+function tcm_cache_clear() {
+  cache_clear_all('tcm:', 'cache', TRUE);
 }
