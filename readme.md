@@ -43,9 +43,9 @@ The component.json-file should include at least a name-property, and if you want
   "backend": {
     "template": "slideshow-item.tpl.haml",
     "options": {
-      “modifier”: “flexEmbed--14to9”,
+      "modifier": "flexEmbed--14to9",
     },
-    “fixture”: {
+    "fixture": {
       "image": {
         "src": "http://fillmurray.com/200/300"
       }
@@ -83,17 +83,17 @@ The options get merged with the default-options, defined in the component.json-f
 TCM provides some helper function to generate content. A fixture-function is prefixed with a ``#``and can have one to many arguments. Here’s an example:
 
 ```
-“fixture”: {
-  “image”: “#image(400, 300)”,
-  “text”: “#lorem_ipsum(3)
+"fixture": {
+  "image": "@image(400, 300)",
+  "text": "@lorem_ipsum(3)"
 }
 ```
 
 ### Available fixture-functions:
 
-* ``#image(width, height)`` Returns an url to a image with size `width` x `height`
-* ``#lorem_ipsum(num_paragraphs, (short|medium|long))`` Renders num_paragraphs paragraphs of lorem ipsum.
-* ``#lorem_ipsum_html(num_paragraphs, (short|medium|long), (decorate:1|0), (links: 1|0) )`` Render num_paragraphs as lorem ipsum, optionally with decoration and/or links.
+* ``@image(width, height)`` Returns an url to a image with size `width` x `height`
+* ``@lorem_ipsum(num_paragraphs, (short|medium|long))`` Renders num_paragraphs paragraphs of lorem ipsum.
+* ``@lorem_ipsum_html(num_paragraphs, (short|medium|long), (decorate:1|0), (links: 1|0) )`` Render num_paragraphs as lorem ipsum, optionally with decoration and/or links.
 
 
 
