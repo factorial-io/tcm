@@ -1,12 +1,12 @@
 <?php
 /**
  * @file
- * the public api for the theme-component-manager
+ * The public api for the theme-component-manager.
  */
 
 
 /**
- * Helper method to convert an object to an array
+ * Helper method to convert an object to an array.
  */
 function _object_to_array($obj) {
   if (is_object($obj)) {
@@ -53,7 +53,8 @@ class ComponentBase extends StdClass {
       $this->template = !empty($data->backend->template) ? $data->backend->template : FALSE;
       if (!empty($data->backend->arguments)) {
         drupal_set_message(t('Component %component uses old format, split arguments into fixture and options!', array(
-          '%component' => $this->name)), 'error');
+          '%component' => $this->name,
+        )), 'error');
       }
       foreach (array('fixture', 'options') as $key) {
         if (!empty($data->backend->{$key})) {
@@ -104,20 +105,29 @@ class ComponentBase extends StdClass {
   }
 
 
+  /**
+   * Get the template.
+   */
   public function getTemplate() {
     $pos = strpos($this->template, '.');
     return substr($this->template, 0, $pos);
   }
 
+  /**
+   *
+   */
   public function hasTemplate() {
     return !empty($this->template);
   }
 
+  /**
+   * Get the folder.
+   */
   public function getFolder() {
     return $this->folder;
   }
-}
 
+}
 
 /**
  * Implementation of hook_theme().
@@ -195,8 +205,9 @@ function _tcm_register_components(&$components, $dir, $recursive) {
   }
 }
 
-
-
+/**
+ * Find and register all components.
+ */
 function tcm_register_components($path_to_theme) {
   static $components = NULL;
   if (!is_null($components)) {
@@ -218,14 +229,12 @@ function tcm_register_components($path_to_theme) {
   return $components;
 }
 
-
 /**
  * Get all registered components.
  */
 function tcm_get_components($path_to_theme = NULL) {
   return tcm_register_components(isset($path_to_theme) ? $path_to_theme : path_to_theme());
 }
-
 
 /**
  * Read a component.
@@ -247,7 +256,6 @@ function tcm_read_component($directory_path) {
   return FALSE;
 }
 
-
 /**
  * Return a themed component.
  */
@@ -256,7 +264,8 @@ function component($component_name, $data = NULL, $options = array()) {
   if (!isset($components[$component_name])) {
     drupal_set_message(t('Component not found %c', array('%c' => $component_name)));
     $msg = t('missing component %component', array(
-      '%component' => $component_name)
+      '%component' => $component_name,
+    )
     );
     return '<div class="missingComponent">' . $msg . '</div>';
   }
@@ -270,7 +279,7 @@ function component($component_name, $data = NULL, $options = array()) {
   return theme($theme_func, array(
     'component' => $component,
     'options' => $options,
-    'data' => $data
+    'data' => $data,
   ));
 }
 
@@ -290,7 +299,6 @@ function _tcm_get_external_fixture_functions() {
 
   return $cache;
 }
-
 
 /**
  * Implementation of hook_preprocess_tcm().
@@ -325,7 +333,7 @@ function tcm_preprocess_component(&$variables) {
           }
           else {
             drupal_set_message(t('Could not find fixture-function %function!', array(
-              '%function' => $func_name
+              '%function' => $func_name,
             )), 'error');
           }
         }
@@ -348,12 +356,11 @@ function tcm_menu() {
   );
 }
 
-
 /**
  * Implements hook_permission().
  */
 function tcm_permission() {
- return array(
+  return array(
     'show tcm components' => array(
       'title' => t('ow TCM components'),
       'description' => t('Show all TCM components.'),
@@ -395,7 +402,7 @@ function tcm_page($component_name = FALSE) {
       ),
       array(
         '#markup' => component($component->getMachineName()),
-      )
+      ),
     );
   };
   return $page;
