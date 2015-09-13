@@ -37,6 +37,7 @@ class ComponentBase extends StdClass {
   protected $template = FALSE;
   protected $fixture = array();
   protected $options = array();
+  protected $variants = array();
 
   /**
    * Constructor.
@@ -56,7 +57,7 @@ class ComponentBase extends StdClass {
           '%component' => $this->name,
         )), 'error');
       }
-      foreach (array('fixture', 'options') as $key) {
+      foreach (array('fixture', 'options', 'variants') as $key) {
         if (!empty($data->backend->{$key})) {
           $this->{$key} = _object_to_array($data->backend->{$key});
         }
@@ -125,6 +126,13 @@ class ComponentBase extends StdClass {
    */
   public function getFolder() {
     return $this->folder;
+  }
+
+  /**
+   * Get variants.
+   */
+  public function getVariants() {
+    return $this->variants;
   }
 
 }
@@ -380,12 +388,45 @@ function tcm_admin_paths() {
 }
 
 /**
+ * Render all available variants
+ */
+function _tcm_render_variants($component, $remaining_variants = array(), $override = array()) {
+  drupal_add_css(drupal_get_path('module', 'tcm') . '/tcm-preview.css');
+
+  if (count($remaining_variants) == 0) {
+    $prefix  = '<div class="ComponentPreview">';
+    $prefix .= '<h1>' . $component->getMachineName() . '</h1>';
+    $prefix .= '<code>' . print_r($override, TRUE). '</code>';
+    $data = $component->getData();
+    $data = drupal_array_merge_deep($data, $override);
+    return $prefix . component($component->getMachineName(), $data) . '</div>';
+  }
+  $key = key($remaining_variants);
+  $list = array_shift($remaining_variants);
+
+  $result = '';
+  foreach ($list as $item) {
+    $new_override = is_array($item) ? $item : array($key => $item);
+    $new_override = drupal_array_merge_deep($override, $new_override);
+    $result .= _tcm_render_variants($component, $remaining_variants, $new_override);
+  }
+
+  return $result;
+}
+
+/**
  * Page callback for components-overview and -detail.
  */
 function tcm_page($component_name = FALSE) {
   tcm_cache_clear();
   if ($component_name) {
-    return component($component_name);
+    $components = tcm_get_components();
+    if (!isset($components[$component_name])) {
+      return MENU_NOT_FOUND;
+    }
+    $component = $components[$component_name];
+
+    return _tcm_render_variants($component, $component->getVariants());
   }
   $components = tcm_get_components();
   dsm($components);
