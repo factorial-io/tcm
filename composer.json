@@ -1,0 +1,6 @@
+{
+    "name": "factorial-io/tcm",
+    "description": "Component based templates for drupal theming",
+    "type": "drupal-module",
+    "license": "GPL-2.0+"
+}
