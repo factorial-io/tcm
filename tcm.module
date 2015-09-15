@@ -52,6 +52,19 @@ class ComponentBase extends StdClass {
 
     if (!empty($data->backend)) {
       $this->template = !empty($data->backend->template) ? $data->backend->template : FALSE;
+      if (is_array($this->template)) {
+        $ext = tcm_get_template_file_extension();
+        // find suitable candidate:
+        $candidate = FALSE;
+        foreach($this->template as $tmpl) {
+          if (substr($tmpl, -strlen($ext)) == $ext) {
+            $candidate = $tmpl;
+          }
+        }
+        if ($candidate) {
+          $this->template = $candidate;
+        }
+      }
       if (!empty($data->backend->arguments)) {
         drupal_set_message(t('Component %component uses old format, split arguments into fixture and options!', array(
           '%component' => $this->name,
@@ -455,3 +468,37 @@ function tcm_page($component_name = FALSE) {
 function tcm_cache_clear() {
   cache_clear_all('tcm:', 'cache', TRUE);
 }
+
+
+/**
+ * Force file extenson for template files
+ */
+function tcm_force_template_file_extension($file_extension = NULL) {
+  static $forced_file_extension;
+  if ($file_extension) {
+    $forced_file_extension = $file_extension;
+  }
+
+  return $forced_file_extension;
+}
+
+/**
+ * Get theme-engine file-extension.
+ */
+function tcm_get_template_file_extension() {
+  global $theme_engine;
+  $ext = tcm_force_template_file_extension();
+  if (!$ext) {
+    $fn = $theme_engine . '_extension';
+    if (function_exists($fn)) {
+      $ext = $fn();
+    }
+  }
+  if (!$ext) {
+    $ext = '.tpl.php';
+  }
+
+  return $ext;
+}
+
+
