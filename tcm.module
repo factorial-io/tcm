@@ -321,6 +321,9 @@ function _tcm_get_external_fixture_functions() {
   return $cache;
 }
 
+
+
+
 /**
  * Implementation of hook_preprocess_tcm().
  */
@@ -333,32 +336,10 @@ function tcm_preprocess_component(&$variables) {
   $variables = drupal_array_merge_deep($variables, $options);
   $variables = drupal_array_merge_deep($variables, $data);
 
+  module_load_include('fixturefunctions.inc', 'tcm');
   array_walk_recursive($variables,
-    function(&$elem) use($fixture_functions) {
-      if (is_string($elem) && (strlen($elem) > 0) && ($elem[0] == '@')) {
-        $pos_1 = strpos($elem, '(');
-        $pos_2 = strpos($elem, ')');
-        if (($pos_1 !== FALSE) && ($pos_2 !== FALSE)) {
-          $func_name = substr($elem, 1, $pos_1 - 1);
-          $params = substr($elem, $pos_1 + 1, $pos_2 - $pos_1 - 1);
-          module_load_include('fixturefunctions.inc', 'tcm');
-          $func_args = array();
-          if (!empty($params)) {
-            $func_args = array_map('trim', explode(',', $params));
-          }
-          if (isset($fixture_functions[$func_name])) {
-            $func_name = $fixture_functions[$func_name];
-          }
-          if (function_exists($func_name)) {
-            $elem = call_user_func_array($func_name, $func_args);
-          }
-          else {
-            drupal_set_message(t('Could not find fixture-function %function!', array(
-              '%function' => $func_name,
-            )), 'error');
-          }
-        }
-      }
+    function(&$elem) use($fixture_functions, $options) {
+      _tcm_parse_fixture_function($elem, $fixture_functions, $options);
     }
   );
 }
