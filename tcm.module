@@ -155,7 +155,7 @@ class ComponentBase extends StdClass {
  */
 function tcm_register_theme_functions($existing, $type, $theme, $path) {
 
-  $components = tcm_get_components();
+  $components = tcm_get_components($path);
   $result = array();
   if (!$components) {
     return array();
@@ -229,20 +229,33 @@ function _tcm_register_components(&$components, $dir, $recursive) {
 /**
  * Find and register all components.
  */
-function tcm_register_components($path_to_theme) {
+function tcm_register_components() {
+  global $theme, $base_theme_info;
+
   static $components = NULL;
   if (!is_null($components)) {
     return $components;
   }
-  $cache_id = 'tcm:components:' . $path_to_theme;
+
+  $cache_id = 'tcm:components:' . $theme;
   if (!variable_get('devel_rebuild_theme_registry', FALSE) && $data = cache_get($cache_id)) {
     $components = $data->data;
     // dsm("get from cache");
   }
   else {
     $components = array();
-    _tcm_register_components($components, $path_to_theme . '/components', TRUE);
-    _tcm_register_components($components, $path_to_theme . '/components_local', FALSE);
+
+    $paths = array_map(function ($info) {
+      return drupal_get_path('theme', $info->name);
+    }, $base_theme_info);
+
+    $paths [] = path_to_theme();
+
+    foreach ($paths as $path_to_theme) {
+      _tcm_register_components($components, $path_to_theme . '/components', TRUE);
+      _tcm_register_components($components, $path_to_theme . '/components_local', FALSE);
+    }
+
     cache_set($cache_id, $components);
     // dsm("get from file-system");
   }
@@ -253,8 +266,8 @@ function tcm_register_components($path_to_theme) {
 /**
  * Get all registered components.
  */
-function tcm_get_components($path_to_theme = NULL) {
-  return tcm_register_components(isset($path_to_theme) ? $path_to_theme : path_to_theme());
+function tcm_get_components() {
+  return tcm_register_components();
 }
 
 /**
@@ -413,8 +426,9 @@ function _tcm_render_variants($component, $remaining_variants = array(), $overri
  */
 function tcm_page($component_name = FALSE) {
   tcm_cache_clear();
+  $components = tcm_get_components();
+
   if ($component_name) {
-    $components = tcm_get_components();
     if (!isset($components[$component_name])) {
       return MENU_NOT_FOUND;
     }
@@ -422,8 +436,7 @@ function tcm_page($component_name = FALSE) {
 
     return _tcm_render_variants($component, $component->getVariants());
   }
-  $components = tcm_get_components();
-  dsm($components);
+
   $page = array();
   foreach ($components as $component) {
     if (!$component->hasTemplate()) {
