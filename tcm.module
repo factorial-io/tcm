@@ -37,6 +37,7 @@ class ComponentBase extends StdClass {
   protected $template = FALSE;
   protected $fixture = array();
   protected $options = array();
+  protected $variants = array();
 
   /**
    * Constructor.
@@ -51,12 +52,25 @@ class ComponentBase extends StdClass {
 
     if (!empty($data->backend)) {
       $this->template = !empty($data->backend->template) ? $data->backend->template : FALSE;
+      if (is_array($this->template)) {
+        $ext = tcm_get_template_file_extension();
+        // find suitable candidate:
+        $candidate = FALSE;
+        foreach($this->template as $tmpl) {
+          if (substr($tmpl, -strlen($ext)) == $ext) {
+            $candidate = $tmpl;
+          }
+        }
+        if ($candidate) {
+          $this->template = $candidate;
+        }
+      }
       if (!empty($data->backend->arguments)) {
         drupal_set_message(t('Component %component uses old format, split arguments into fixture and options!', array(
           '%component' => $this->name,
         )), 'error');
       }
-      foreach (array('fixture', 'options') as $key) {
+      foreach (array('fixture', 'options', 'variants') as $key) {
         if (!empty($data->backend->{$key})) {
           $this->{$key} = _object_to_array($data->backend->{$key});
         }
@@ -127,6 +141,13 @@ class ComponentBase extends StdClass {
     return $this->folder;
   }
 
+  /**
+   * Get variants.
+   */
+  public function getVariants() {
+    return $this->variants;
+  }
+
 }
 
 /**
@@ -134,7 +155,7 @@ class ComponentBase extends StdClass {
  */
 function tcm_register_theme_functions($existing, $type, $theme, $path) {
 
-  $components = tcm_get_components();
+  $components = tcm_get_components($path);
   $result = array();
   if (!$components) {
     return array();
@@ -208,20 +229,33 @@ function _tcm_register_components(&$components, $dir, $recursive) {
 /**
  * Find and register all components.
  */
-function tcm_register_components($path_to_theme) {
+function tcm_register_components() {
+  global $theme, $base_theme_info;
+
   static $components = NULL;
   if (!is_null($components)) {
     return $components;
   }
-  $cache_id = 'tcm:components:' . $path_to_theme;
+
+  $cache_id = 'tcm:components:' . $theme;
   if (!variable_get('devel_rebuild_theme_registry', FALSE) && $data = cache_get($cache_id)) {
     $components = $data->data;
     // dsm("get from cache");
   }
   else {
     $components = array();
-    _tcm_register_components($components, $path_to_theme . '/components', TRUE);
-    _tcm_register_components($components, $path_to_theme . '/components_local', FALSE);
+
+    $paths = array_map(function ($info) {
+      return drupal_get_path('theme', $info->name);
+    }, $base_theme_info);
+
+    $paths [] = path_to_theme();
+
+    foreach ($paths as $path_to_theme) {
+      _tcm_register_components($components, $path_to_theme . '/components', TRUE);
+      _tcm_register_components($components, $path_to_theme . '/components_local', FALSE);
+    }
+
     cache_set($cache_id, $components);
     // dsm("get from file-system");
   }
@@ -232,8 +266,8 @@ function tcm_register_components($path_to_theme) {
 /**
  * Get all registered components.
  */
-function tcm_get_components($path_to_theme = NULL) {
-  return tcm_register_components(isset($path_to_theme) ? $path_to_theme : path_to_theme());
+function tcm_get_components() {
+  return tcm_register_components();
 }
 
 /**
@@ -300,6 +334,9 @@ function _tcm_get_external_fixture_functions() {
   return $cache;
 }
 
+
+
+
 /**
  * Implementation of hook_preprocess_tcm().
  */
@@ -312,32 +349,10 @@ function tcm_preprocess_component(&$variables) {
   $variables = drupal_array_merge_deep($variables, $options);
   $variables = drupal_array_merge_deep($variables, $data);
 
+  module_load_include('fixturefunctions.inc', 'tcm');
   array_walk_recursive($variables,
-    function(&$elem) use($fixture_functions) {
-      if (is_string($elem) && (strlen($elem) > 0) && ($elem[0] == '@')) {
-        $pos_1 = strpos($elem, '(');
-        $pos_2 = strpos($elem, ')');
-        if (($pos_1 !== FALSE) && ($pos_2 !== FALSE)) {
-          $func_name = substr($elem, 1, $pos_1 - 1);
-          $params = substr($elem, $pos_1 + 1, $pos_2 - $pos_1 - 1);
-          module_load_include('fixturefunctions.inc', 'tcm');
-          $func_args = array();
-          if (!empty($params)) {
-            $func_args = array_map('trim', explode(',', $params));
-          }
-          if (isset($fixture_functions[$func_name])) {
-            $func_name = $fixture_functions[$func_name];
-          }
-          if (function_exists($func_name)) {
-            $elem = call_user_func_array($func_name, $func_args);
-          }
-          else {
-            drupal_set_message(t('Could not find fixture-function %function!', array(
-              '%function' => $func_name,
-            )), 'error');
-          }
-        }
-      }
+    function(&$elem) use($fixture_functions, $options) {
+      _tcm_parse_fixture_function($elem, $fixture_functions, $options);
     }
   );
 }
@@ -380,15 +395,48 @@ function tcm_admin_paths() {
 }
 
 /**
+ * Render all available variants
+ */
+function _tcm_render_variants($component, $remaining_variants = array(), $override = array()) {
+  drupal_add_css(drupal_get_path('module', 'tcm') . '/tcm-preview.css');
+
+  if (count($remaining_variants) == 0) {
+    $prefix  = '<div class="ComponentPreview">';
+    $prefix .= '<h1>' . $component->getMachineName() . '</h1>';
+    $prefix .= '<code>' . print_r($override, TRUE). '</code>';
+    $data = $component->getData();
+    $data = drupal_array_merge_deep($data, $override);
+    return $prefix . component($component->getMachineName(), $data) . '</div>';
+  }
+  $key = key($remaining_variants);
+  $list = array_shift($remaining_variants);
+
+  $result = '';
+  foreach ($list as $item) {
+    $new_override = is_array($item) ? $item : array($key => $item);
+    $new_override = drupal_array_merge_deep($override, $new_override);
+    $result .= _tcm_render_variants($component, $remaining_variants, $new_override);
+  }
+
+  return $result;
+}
+
+/**
  * Page callback for components-overview and -detail.
  */
 function tcm_page($component_name = FALSE) {
   tcm_cache_clear();
-  if ($component_name) {
-    return component($component_name);
-  }
   $components = tcm_get_components();
-  dsm($components);
+
+  if ($component_name) {
+    if (!isset($components[$component_name])) {
+      return MENU_NOT_FOUND;
+    }
+    $component = $components[$component_name];
+
+    return _tcm_render_variants($component, $component->getVariants());
+  }
+
   $page = array();
   foreach ($components as $component) {
     if (!$component->hasTemplate()) {
@@ -414,3 +462,37 @@ function tcm_page($component_name = FALSE) {
 function tcm_cache_clear() {
   cache_clear_all('tcm:', 'cache', TRUE);
 }
+
+
+/**
+ * Force file extenson for template files
+ */
+function tcm_force_template_file_extension($file_extension = NULL) {
+  static $forced_file_extension;
+  if ($file_extension) {
+    $forced_file_extension = $file_extension;
+  }
+
+  return $forced_file_extension;
+}
+
+/**
+ * Get theme-engine file-extension.
+ */
+function tcm_get_template_file_extension() {
+  global $theme_engine;
+  $ext = tcm_force_template_file_extension();
+  if (!$ext) {
+    $fn = $theme_engine . '_extension';
+    if (function_exists($fn)) {
+      $ext = $fn();
+    }
+  }
+  if (!$ext) {
+    $ext = '.tpl.php';
+  }
+
+  return $ext;
+}
+
+
